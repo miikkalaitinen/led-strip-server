@@ -11,7 +11,7 @@ import { AppData, Controller, LedState, Preset, StoredController } from './types
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
 const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, 'data.json')
-const DIST_PATH = path.join(__dirname, 'dist')
+const FRONTEND_PATH = path.join(__dirname, 'frontend')
 const PORT = process.env.PORT || 3000
 
 const DEFAULT_DATA: AppData = {
@@ -282,7 +282,7 @@ app.delete('/api/presets/:controllerId/:presetId', async (req: Request, res: Res
 // --- Static Frontend Serving ---
 
 // 1. Serve static files from the Vue build directory
-app.use(express.static(DIST_PATH))
+app.use(express.static(FRONTEND_PATH))
 
 // 2. Catch-all fallback:
 // - return 404 for unknown API routes
@@ -292,12 +292,12 @@ app.use((req: Request, res: Response) => {
     return res.status(404).json({ error: 'API route not found' })
   }
 
-  res.sendFile(path.join(DIST_PATH, 'index.html'))
+  res.sendFile(path.join(FRONTEND_PATH, 'index.html'))
 })
 
 // --- Start Server ---
 app.listen(PORT, () => {
   console.log(`🚀 Monolith Server running at http://localhost:${PORT}`)
-  console.log(`📁 Serving UI from: ${DIST_PATH}`)
+  console.log(`📁 Serving UI from: ${FRONTEND_PATH}`)
   console.log(`💾 Database file: ${DATA_FILE}`)
 })
