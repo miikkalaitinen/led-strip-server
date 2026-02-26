@@ -1,43 +1,39 @@
-# Build the frontend
-FROM node:25-alpine AS frontend-builder
+FROM node:25-alpine AS builder
+
 WORKDIR /app
+
 COPY package*.json ./
 RUN npm install
+
 COPY . .
 RUN npm run build
 
-# Build the backend
-FROM node:25-alpine AS backend-builder
-WORKDIR /app
-COPY backend/package*.json ./
-RUN npm install
-COPY backend/ ./
+COPY backend/package*.json ./backend/
+RUN npm install --prefix backend
+
+COPY backend/ ./backend/
+
+WORKDIR /app/backend
+RUN npm run type-check || true
 RUN npx tsc
 
-# Production image
-FROM node:25-alpine
+FROM node:25-alpine AS production
+
 WORKDIR /app
 
-# Copy backend package files and install production dependencies
-COPY backend/package*.json ./
-RUN npm install --omit=dev
+ENV NODE_ENV=production
 
-# Copy built backend files
-COPY --from=backend-builder /app/dist ./dist
+COPY backend/package*.json ./backend/
+RUN npm install --prefix backend --omit=dev
 
-# Copy built frontend files to the backend's dist folder so it can serve them
-COPY --from=frontend-builder /app/dist ./dist/dist
+COPY --from=builder /app/backend/dist ./dist
+RUN mv backend/node_modules ./node_modules && rm -rf backend
 
-# Create a volume for persistent data
 VOLUME ["/app/data"]
 
-# Set environment variables
-ENV NODE_ENV=production
 ENV PORT=3000
 ENV DATA_FILE=/app/data/data.json
 
-# Expose the port
 EXPOSE 3000
 
-# Start the application
 CMD ["node", "dist/index.js"]
