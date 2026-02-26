@@ -7,7 +7,6 @@ backend/src
 
 # Ignore any local builds
 dist
-backend/dist
 
 # Ignore git
 .git
