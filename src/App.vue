@@ -1,47 +1,46 @@
 <script setup lang="ts">
-import HelloWorld from './components/HelloWorld.vue'
-import TheWelcome from './components/TheWelcome.vue'
+import { onMounted } from 'vue'
+import { useControllersStore } from '@/stores/controllersStore'
+import ControllersList from '@/components/ControllersList.vue'
+import ControllerDetail from '@/components/ControllerDetail.vue'
+
+const store = useControllersStore()
+
+onMounted(() => {
+  store.fetchControllers()
+})
 </script>
 
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="./assets/logo.svg" width="125" height="125" />
+  <div class="app">
+    <header>
+      <h1 @click="store.goHome()">LED Strip Controller</h1>
+      <button v-if="store.activeControllerId" @click="store.goHome()">
+        ← Back
+      </button>
+    </header>
 
-    <div class="wrapper">
-      <HelloWorld msg="You did it!" />
-    </div>
-  </header>
-
-  <main>
-    <TheWelcome />
-  </main>
+    <main>
+      <ControllersList v-if="!store.activeControllerId" />
+      <ControllerDetail v-else />
+    </main>
+  </div>
 </template>
 
-<style scoped>
+<style>
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: #121212;
+  color: white;
+}
 header {
-  line-height: 1.5;
+  padding: 1rem;
+  background: #1e1e1e;
+  display: flex;
+  justify-content: space-between;
 }
-
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
-}
-
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
-  }
-
-  .logo {
-    margin: 0 2rem 0 0;
-  }
-
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
+main {
+  padding: 1rem;
 }
 </style>
