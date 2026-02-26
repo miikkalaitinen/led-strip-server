@@ -1,19 +1,7 @@
-export interface SavedColor {
-  id: string
-  label: string
-  r: number
-  g: number
-  b: number
-  w: number
-  br: number
-}
-
 export interface Controller {
   id: string
-  ui_name: string
   ip: string
   port: number
-  savedColors: SavedColor[]
 }
 
 export interface LedState {
@@ -23,4 +11,19 @@ export interface LedState {
   b: number
   w: number
   br: number
+}
+
+export interface DeviceStatus extends LedState {
+  ui_name: string
+}
+
+export interface Preset {
+  id: number
+  name: string
+  state: LedState
+}
+
+export interface InitResponse {
+  controllers: Controller[]
+  presets: Record<string, Preset[]>
 }

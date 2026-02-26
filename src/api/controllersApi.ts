@@ -1,36 +1,45 @@
 import axios, { AxiosResponse } from 'axios'
-import type { Controller, LedState, SavedColor } from '@/types'
+import type { DeviceStatus, InitResponse, LedState } from '@/types'
 
 const client = axios.create({
   baseURL: '/api',
-  timeout: 5000
+  timeout: 5000,
 })
 
 export default {
-  getControllers(): Promise<AxiosResponse<Controller[]>> {
-    return client.get('/controllers')
+  getInitData(): Promise<AxiosResponse<InitResponse>> {
+    return client.get('/init')
   },
 
-  getControllerStatus(id: string): Promise<AxiosResponse<LedState>> {
-    return client.get(`/controllers/${id}/status`)
+  saveController(payload: { ip: string; port: number }) {
+    return client.post('/controllers', payload)
+  },
+
+  updateController(id: string, payload: { ip: string; port: number }) {
+    return client.put(`/controllers/${id}`, payload)
+  },
+
+  deleteController(id: string) {
+    return client.delete(`/controllers/${id}`)
+  },
+
+  getControllerStatus(id: string): Promise<AxiosResponse<DeviceStatus>> {
+    return client.get(`/proxy/${id}/status`)
   },
 
   setControllerState(id: string, payload: LedState) {
-    return client.post(`/controllers/${id}/set`, payload)
+    return client.post(`/proxy/${id}/set`, payload)
   },
 
-  saveColor(id: string, payload: Omit<SavedColor, 'id'>) {
-    return client.post(`/controllers/${id}/colors`, payload)
+  savePreset(id: string, payload: { name: string; state: LedState }) {
+    return client.post(`/presets/${id}`, payload)
   },
 
-  deleteColor(id: string, colorId: string) {
-    return client.delete(`/controllers/${id}/colors/${colorId}`)
+  deletePreset(id: string, presetId: number) {
+    return client.delete(`/presets/${id}/${presetId}`)
   },
 
-  updateConfig(
-    id: string,
-    payload: { ui_name: string; ssid: string; pass: string }
-  ) {
-    return client.post(`/controllers/${id}/config`, payload)
-  }
+  updateConfig(id: string, payload: { ui_name: string; ssid: string; pass: string }) {
+    return client.post(`/proxy/${id}/config`, payload)
+  },
 }

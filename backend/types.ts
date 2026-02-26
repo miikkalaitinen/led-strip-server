@@ -7,11 +7,15 @@ export interface LedState {
   br: number
 }
 
+export interface StoredController {
+  ip: string
+  port: number
+}
+
 export interface Controller {
   id: string
   ip: string
   port: number
-  ui_name: string
 }
 
 export interface Preset {
@@ -21,6 +25,6 @@ export interface Preset {
 }
 
 export interface AppData {
-  controllers: Controller[]
+  controllers: StoredController[]
   presets: Record<string, Preset[]> // Keyed by controllerId
 }
