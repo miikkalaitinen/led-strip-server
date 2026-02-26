@@ -137,3 +137,96 @@ Handled automatically by the controller for modern browser compatibility. Browse
 - **Endpoint:** Any
 - **Method:** `OPTIONS`
 - **Response Headers:** `204 No Content`
+
+```
+# LED GATEWAY API SPECIFICATION (V3 - PERSISTENT MONOLITH)
+
+This API serves as the central brain for the LED system. It manages a registry of controllers, stores user-defined color presets in a persistent JSON database, and proxies real-time commands to the physical ESP8266 hardware.
+
+---
+
+### BASE CONFIGURATION
+* Protocol: HTTP/1.1
+* Base URL: http://[UNRAID_IP]:3000
+* Content-Type: application/json
+* CORS: Enabled (Supports cross-origin requests from development environments)
+
+---
+
+### 1. INITIALIZATION & REGISTRY
+Use this endpoint when the Vue app first loads to retrieve the entire system state.
+
+* Endpoint: /api/init
+* Method: GET
+* Description: Returns all registered controllers and all saved presets.
+* Response Body:
+{
+  "controllers": [
+    { "id": "kitchen-1", "ip": "192.168.1.50", "port": 80, "ui_name": "Kitchen LEDs" }
+  ],
+  "presets": {
+    "kitchen-1": [
+      { "id": 1708963200, "name": "Cozy Warm", "state": { "on": true, "r": 255, "g": 100, "b": 20, "w": 50, "br": 0.5 } }
+    ]
+  }
+}
+
+---
+
+### 2. CONTROLLER MANAGEMENT
+Add a new physical LED strip to the system or update the connection details of an existing one.
+
+* Endpoint: /api/controllers
+* Method: POST
+* Payload Example:
+{
+  "id": "kitchen-main",
+  "ip": "192.168.1.50",
+  "port": 80,
+  "ui_name": "Kitchen LEDs"
+}
+
+---
+
+### 3. REAL-TIME LED CONTROL (PROXY)
+This endpoint forwards commands from the UI directly to the ESP8266. This bypasses CORS issues in the browser by routing through the Node.js server.
+
+* Endpoint: /api/proxy/:controllerId/set
+* Method: POST
+* Description: Forwards the JSON body to the ESP8266 associated with the :controllerId.
+* Request Body:
+{
+  "on": true,
+  "r": 150,
+  "g": 60,
+  "b": 0,
+  "w": 10,
+  "br": 0.5
+}
+* Success Response: 200 OK -> {"success": true}
+* Error Response: 502 Bad Gateway (Returned if the ESP8266 is offline or unreachable).
+
+---
+
+### 4. PRESETS (PERSISTENCE)
+Manage saved color profiles. These are stored in data.json on the server and survive restarts.
+
+#### SAVE A PRESET
+* Endpoint: /api/presets/:controllerId
+* Method: POST
+* Payload: { "name": "Relaxing Evening", "state": { "on": true, "r": 20, "g": 0, "b": 100, "w": 0, "br": 0.3 } }
+
+#### DELETE A PRESET
+* Endpoint: /api/presets/:controllerId/:presetId
+* Method: DELETE
+* Description: Removes a specific preset from the collection.
+
+---
+
+### 5. FRONTEND STATIC SERVING
+The backend is configured to serve the built Vue application automatically.
+
+* Static Path: / (Serves index.html)
+* Assets Path: /assets/* (Serves JS/CSS files)
+* Fallback: Any non-API route (e.g., /settings or /dashboard) is redirected to the Vue index.html to allow Vue Router to handle navigation.
+```
