@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import api from '@/api/controllersApi'
 import type { LedState, Preset } from '@/types'
 
@@ -10,7 +11,41 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   changed: []
+  apply: [state: LedState]
 }>()
+
+const longPressTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+
+function startPress(preset: Preset, event?: MouseEvent | TouchEvent) {
+  // Only react to left clicks for mouse events
+  if (event instanceof MouseEvent && event.button !== 0) return
+
+  if (longPressTimer.value) clearTimeout(longPressTimer.value)
+
+  longPressTimer.value = setTimeout(() => {
+    longPressTimer.value = null
+    if (confirm(`Delete this color ${preset.name}?`)) {
+      remove(preset.id)
+    }
+  }, 600)
+}
+
+function endPress(preset: Preset, event?: MouseEvent | TouchEvent) {
+  if (event instanceof MouseEvent && event.button !== 0) return
+
+  if (longPressTimer.value) {
+    clearTimeout(longPressTimer.value)
+    longPressTimer.value = null
+    apply(preset)
+  }
+}
+
+function cancelPress() {
+  if (longPressTimer.value) {
+    clearTimeout(longPressTimer.value)
+    longPressTimer.value = null
+  }
+}
 
 async function save() {
   const name = prompt('Preset name')
@@ -32,7 +67,7 @@ async function save() {
 }
 
 function apply(preset: Preset) {
-  Object.assign(props.currentState, preset.state)
+  emit('apply', preset.state)
 }
 
 async function remove(id: number) {
@@ -44,15 +79,26 @@ async function remove(id: number) {
 <template>
   <section class="presets">
     <h3>Saved Colors</h3>
+    <p class="hint">Tap to apply, long press to delete</p>
 
-    <div v-for="preset in presets" :key="preset.id" class="preset-row">
+    <div
+      v-for="preset in presets"
+      :key="preset.id"
+      class="preset-row interactive"
+      @mousedown="startPress(preset, $event)"
+      @mouseup="endPress(preset, $event)"
+      @mouseleave="cancelPress"
+      @touchstart="startPress(preset, $event)"
+      @touchend="endPress(preset, $event)"
+      @touchmove="cancelPress"
+      @touchcancel="cancelPress"
+      @contextmenu.prevent
+    >
       <span
         class="preview"
         :style="{ background: `rgb(${preset.state.r},${preset.state.g},${preset.state.b})` }"
       />
       <span class="name">{{ preset.name }}</span>
-      <button @click="apply(preset)">Apply</button>
-      <button @click="remove(preset.id)">Delete</button>
     </div>
 
     <div class="save-action">
@@ -72,9 +118,15 @@ async function remove(id: number) {
 }
 
 h3 {
-  margin: 0 0 1rem;
+  margin: 0 0 0.25rem;
   font-size: 1.1rem;
   font-weight: 600;
+}
+
+.hint {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .save-action {
@@ -94,13 +146,27 @@ h3 {
 
 .preset-row {
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-columns: auto 1fr;
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem;
   border-radius: 16px;
   background: var(--surface-2);
   margin-bottom: 0.5rem;
+}
+
+.preset-row.interactive {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition:
+    background 0.2s,
+    transform 0.1s;
+}
+
+.preset-row.interactive:active {
+  background: var(--surface-3);
+  transform: scale(0.98);
 }
 
 .preview {
@@ -117,27 +183,5 @@ h3 {
   white-space: nowrap;
   font-weight: 500;
   font-size: 0.95rem;
-}
-
-.preset-row button {
-  min-height: 36px;
-  padding: 0.25rem 0.75rem;
-  font-size: 0.85rem;
-  border-radius: 10px;
-  background: var(--surface-3);
-}
-
-.preset-row button:active {
-  background: var(--surface-1);
-}
-
-@media (max-width: 540px) {
-  .preset-row {
-    grid-template-columns: auto 1fr;
-  }
-
-  .preset-row button {
-    grid-column: 1 / -1;
-  }
 }
 </style>

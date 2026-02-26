@@ -10,7 +10,7 @@ import { AppData, Controller, LedState, Preset, StoredController } from './types
 // --- Configuration & Setup ---
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
-const DATA_FILE = path.join(__dirname, 'data.json')
+const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, 'data.json')
 const DIST_PATH = path.join(__dirname, 'dist')
 const PORT = process.env.PORT || 3000
 
