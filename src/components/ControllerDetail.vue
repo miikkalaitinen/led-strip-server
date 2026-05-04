@@ -203,6 +203,11 @@ async function togglePower() {
       :currentState="state"
       :presets="presets"
       @changed="emit('presetsChanged')"
+      @apply="
+        (s) => {
+          if (state) Object.assign(state, s)
+        }
+      "
     />
 
     <details>

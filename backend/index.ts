@@ -279,6 +279,43 @@ app.delete('/api/presets/:controllerId/:presetId', async (req: Request, res: Res
   res.json({ success: true })
 })
 
+// Reorder Presets
+app.put('/api/presets/:controllerId/reorder', async (req: Request, res: Response) => {
+  const { controllerId } = req.params as { controllerId: string }
+  const { order } = req.body as { order: number[] }
+
+  if (!Array.isArray(order)) {
+    return res.status(400).json({ error: 'order must be an array of preset ids' })
+  }
+
+  const data = await loadData()
+  const controllerPresets = data.presets[controllerId]
+
+  if (!controllerPresets) {
+    return res.status(404).json({ error: 'No presets found for this controller' })
+  }
+
+  const presetsById = new Map(controllerPresets.map((p) => [p.id, p]))
+  const reordered: Preset[] = []
+
+  for (const id of order) {
+    const preset = presetsById.get(id)
+    if (preset) {
+      reordered.push(preset)
+      presetsById.delete(id)
+    }
+  }
+
+  // Append any presets not included in the order array
+  for (const preset of presetsById.values()) {
+    reordered.push(preset)
+  }
+
+  data.presets[controllerId] = reordered
+  await saveData(data)
+  res.json({ success: true })
+})
+
 // --- Static Frontend Serving ---
 
 // 1. Serve static files from the Vue build directory

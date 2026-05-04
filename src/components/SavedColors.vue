@@ -14,37 +14,152 @@ const emit = defineEmits<{
   apply: [state: LedState]
 }>()
 
-const longPressTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+const editing = ref(false)
+const editList = ref<Preset[]>([])
 
-function startPress(preset: Preset, event?: MouseEvent | TouchEvent) {
-  // Only react to left clicks for mouse events
-  if (event instanceof MouseEvent && event.button !== 0) return
+let longPressTimer: ReturnType<typeof setTimeout> | null = null
+let longPressTriggered = false
 
-  if (longPressTimer.value) clearTimeout(longPressTimer.value)
+// --- Drag state ---
+let dragIndex: number | null = null
 
-  longPressTimer.value = setTimeout(() => {
-    longPressTimer.value = null
-    if (confirm(`Delete this color ${preset.name}?`)) {
-      remove(preset.id)
-    }
+function startPress() {
+  longPressTriggered = false
+  if (longPressTimer) clearTimeout(longPressTimer)
+
+  longPressTimer = setTimeout(() => {
+    longPressTimer = null
+    longPressTriggered = true
+    enterEditMode()
   }, 600)
 }
 
-function endPress(preset: Preset, event?: MouseEvent | TouchEvent) {
-  if (event instanceof MouseEvent && event.button !== 0) return
+function cancelPress() {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer)
+    longPressTimer = null
+  }
+}
 
-  if (longPressTimer.value) {
-    clearTimeout(longPressTimer.value)
-    longPressTimer.value = null
+function handleClick(preset: Preset) {
+  cancelPress()
+  if (longPressTriggered) {
+    longPressTriggered = false
+    return
+  }
+  if (!editing.value) {
     apply(preset)
   }
 }
 
-function cancelPress() {
-  if (longPressTimer.value) {
-    clearTimeout(longPressTimer.value)
-    longPressTimer.value = null
+function enterEditMode() {
+  editList.value = [...props.presets]
+  editing.value = true
+}
+
+async function saveOrder() {
+  const order = editList.value.map((p) => p.id)
+  await api.reorderPresets(props.controllerId, order)
+  editing.value = false
+  emit('changed')
+}
+
+function cancelEdit() {
+  editing.value = false
+}
+
+async function removeInEdit(preset: Preset) {
+  if (!confirm(`Delete this color "${preset.name}"?`)) return
+  await api.deletePreset(props.controllerId, preset.id)
+  editList.value = editList.value.filter((p) => p.id !== preset.id)
+  emit('changed')
+}
+
+// --- Drag handlers ---
+function onDragStart(index: number, event: DragEvent) {
+  dragIndex = index
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
   }
+}
+
+function onDragOver(index: number, event: DragEvent) {
+  event.preventDefault()
+  if (dragIndex !== null && dragIndex !== index) {
+    const [item] = editList.value.splice(dragIndex, 1)
+    if (item) editList.value.splice(index, 0, item)
+    dragIndex = index
+  }
+}
+
+function onDrop() {
+  dragIndex = null
+}
+
+function onDragEnd() {
+  dragIndex = null
+}
+
+// --- Touch drag handlers ---
+let touchDragIndex: number | null = null
+let touchClone: HTMLElement | null = null
+let touchStartY = 0
+let rowHeight = 0
+
+function onTouchDragStart(index: number, event: TouchEvent) {
+  const touch = event.touches[0]
+  if (!touch) return
+  touchDragIndex = index
+  touchStartY = touch.clientY
+
+  const row = (event.target as HTMLElement).closest('.preset-row') as HTMLElement
+  if (!row) return
+  rowHeight = row.offsetHeight + 8 // include margin
+
+  touchClone = row.cloneNode(true) as HTMLElement
+  touchClone.style.position = 'fixed'
+  touchClone.style.left = row.getBoundingClientRect().left + 'px'
+  touchClone.style.top = touch.clientY - row.offsetHeight / 2 + 'px'
+  touchClone.style.width = row.offsetWidth + 'px'
+  touchClone.style.opacity = '0.8'
+  touchClone.style.zIndex = '1000'
+  touchClone.style.pointerEvents = 'none'
+  document.body.appendChild(touchClone)
+
+  row.style.opacity = '0.3'
+}
+
+function onTouchDragMove(event: TouchEvent) {
+  if (touchDragIndex === null || !touchClone) return
+  event.preventDefault()
+
+  const touch = event.touches[0]
+  if (!touch) return
+  touchClone.style.top = touch.clientY - touchClone.offsetHeight / 2 + 'px'
+
+  const delta = touch.clientY - touchStartY
+  const indexShift = Math.round(delta / rowHeight)
+  const newIndex = Math.max(0, Math.min(editList.value.length - 1, touchDragIndex + indexShift))
+
+  if (newIndex !== touchDragIndex) {
+    const [item] = editList.value.splice(touchDragIndex, 1)
+    if (item) editList.value.splice(newIndex, 0, item)
+    touchStartY += (newIndex - touchDragIndex) * rowHeight
+    touchDragIndex = newIndex
+  }
+}
+
+function onTouchDragEnd(event: TouchEvent) {
+  if (touchClone) {
+    touchClone.remove()
+    touchClone = null
+  }
+
+  // Reset opacity on all rows
+  const rows = (event.target as HTMLElement)?.closest('.presets')?.querySelectorAll('.preset-row')
+  rows?.forEach((r) => ((r as HTMLElement).style.opacity = ''))
+
+  touchDragIndex = null
 }
 
 async function save() {
@@ -69,37 +184,68 @@ async function save() {
 function apply(preset: Preset) {
   emit('apply', preset.state)
 }
-
-async function remove(id: number) {
-  await api.deletePreset(props.controllerId, id)
-  emit('changed')
-}
 </script>
 
 <template>
   <section class="presets">
-    <h3>Saved Colors</h3>
-    <p class="hint">Tap to apply, long press to delete</p>
-
-    <div
-      v-for="preset in presets"
-      :key="preset.id"
-      class="preset-row interactive"
-      @mousedown="startPress(preset, $event)"
-      @mouseup="endPress(preset, $event)"
-      @mouseleave="cancelPress"
-      @touchstart="startPress(preset, $event)"
-      @touchend="endPress(preset, $event)"
-      @touchmove="cancelPress"
-      @touchcancel="cancelPress"
-      @contextmenu.prevent
-    >
-      <span
-        class="preview"
-        :style="{ background: `rgb(${preset.state.r},${preset.state.g},${preset.state.b})` }"
-      />
-      <span class="name">{{ preset.name }}</span>
+    <div class="header-row">
+      <h3>Saved Colors</h3>
+      <div v-if="editing" class="edit-actions">
+        <button class="edit-btn cancel" @click="cancelEdit">Cancel</button>
+        <button class="edit-btn confirm" @click="saveOrder">Save</button>
+      </div>
     </div>
+    <p class="hint">{{ editing ? 'Drag to reorder' : 'Tap to apply, long press to edit' }}</p>
+
+    <!-- Normal mode -->
+    <template v-if="!editing">
+      <div
+        v-for="preset in presets"
+        :key="preset.id"
+        class="preset-row interactive"
+        @mousedown="startPress()"
+        @touchstart.prevent="startPress()"
+        @mouseleave="cancelPress"
+        @touchmove="cancelPress"
+        @touchcancel="cancelPress"
+        @click="handleClick(preset)"
+        @contextmenu.prevent
+      >
+        <span
+          class="preview"
+          :style="{ background: `rgb(${preset.state.r},${preset.state.g},${preset.state.b})` }"
+        />
+        <span class="name">{{ preset.name }}</span>
+      </div>
+    </template>
+
+    <!-- Edit mode -->
+    <template v-else>
+      <div
+        v-for="(preset, index) in editList"
+        :key="preset.id"
+        class="preset-row edit-row"
+        draggable="true"
+        @dragstart="onDragStart(index, $event)"
+        @dragover="onDragOver(index, $event)"
+        @drop="onDrop()"
+        @dragend="onDragEnd"
+      >
+        <span
+          class="drag-handle"
+          @touchstart="onTouchDragStart(index, $event)"
+          @touchmove="onTouchDragMove($event)"
+          @touchend="onTouchDragEnd($event)"
+          >⠿</span
+        >
+        <span
+          class="preview"
+          :style="{ background: `rgb(${preset.state.r},${preset.state.g},${preset.state.b})` }"
+        />
+        <span class="name">{{ preset.name }}</span>
+        <button class="delete-btn" @click="removeInEdit(preset)">✕</button>
+      </div>
+    </template>
 
     <div class="save-action">
       <button class="save-btn" @click="save">Save Current Color</button>
@@ -117,10 +263,40 @@ async function remove(id: number) {
   border: 1px solid var(--border);
 }
 
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 h3 {
   margin: 0 0 0.25rem;
   font-size: 1.1rem;
   font-weight: 600;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.edit-btn {
+  padding: 0.3rem 0.75rem;
+  font-size: 0.85rem;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.edit-btn.cancel {
+  background: var(--surface-3);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.edit-btn.confirm {
+  background: rgba(50, 180, 50, 0.3);
+  color: #4f4;
 }
 
 .hint {
@@ -167,6 +343,63 @@ h3 {
 .preset-row.interactive:active {
   background: var(--surface-3);
   transform: scale(0.98);
+}
+
+.preset-row.edit-row {
+  grid-template-columns: auto auto 1fr auto;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  animation: wiggle 0.3s ease-in-out infinite alternate;
+}
+
+.preset-row.edit-row:nth-child(odd) {
+  animation-delay: -0.15s;
+}
+
+.preset-row.edit-row:active {
+  cursor: grabbing;
+  animation: none;
+}
+
+@keyframes wiggle {
+  0% {
+    transform: rotate(-0.4deg);
+  }
+  100% {
+    transform: rotate(0.4deg);
+  }
+}
+
+.drag-handle {
+  font-size: 1.2rem;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: grab;
+  touch-action: none;
+  padding: 0 0.25rem;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.delete-btn {
+  background: rgba(255, 60, 60, 0.2);
+  color: #f66;
+  border: none;
+  border-radius: 10px;
+  width: 36px;
+  height: 36px;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.delete-btn:active {
+  background: rgba(255, 60, 60, 0.4);
 }
 
 .preview {

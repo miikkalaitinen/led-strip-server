@@ -39,6 +39,10 @@ export default {
     return client.delete(`/presets/${id}/${presetId}`)
   },
 
+  reorderPresets(id: string, order: number[]) {
+    return client.put(`/presets/${id}/reorder`, { order })
+  },
+
   updateConfig(id: string, payload: { ui_name: string; ssid: string; pass: string }) {
     return client.post(`/proxy/${id}/config`, payload)
   },
