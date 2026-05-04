@@ -54,6 +54,14 @@ async function togglePower(event: MouseEvent) {
     toggling.value = false
   }
 }
+
+function previewStyle(current: DeviceStatus) {
+  const glow = Math.min(0.6, 0.15 + current.br * 0.45)
+  return {
+    background: `rgb(${current.r},${current.g},${current.b})`,
+    boxShadow: `0 0 0 2px rgba(255, 255, 255, 0.1), 0 0 18px rgba(${current.r}, ${current.g}, ${current.b}, ${glow})`,
+  }
+}
 </script>
 
 <template>
@@ -66,10 +74,15 @@ async function togglePower(event: MouseEvent) {
     </div>
 
     <div v-if="status" class="status-wrap">
-      <div class="preview" :style="{ background: `rgb(${status.r},${status.g},${status.b})` }" />
+      <div class="preview" :style="previewStyle(status)" />
       <div class="details">
-        <p class="meta">Brightness: {{ Math.round(status.br * 100) }}%</p>
-        <p class="meta-rgb">RGBW: {{ status.r }}, {{ status.g }}, {{ status.b }}, {{ status.w }}</p>
+        <div class="meta-row">
+          <span class="chip chip-r">R {{ status.r }}</span>
+          <span class="chip chip-g">G {{ status.g }}</span>
+          <span class="chip chip-b">B {{ status.b }}</span>
+          <span class="chip chip-w">W {{ status.w }}</span>
+          <span class="chip chip-br">Br {{ Math.round(status.br * 100) }}%</span>
+        </div>
       </div>
       <button class="power-btn" :disabled="toggling" @click="togglePower">
         {{ status.on ? 'Turn Off' : 'Turn On' }}
@@ -129,20 +142,53 @@ async function togglePower(event: MouseEvent) {
 .details {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.35rem;
 }
 
-.meta {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 0.95rem;
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
 }
 
-.meta-rgb {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 0.8rem;
-  opacity: 0.8;
+.chip {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-3);
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.02em;
+}
+
+.chip-r {
+  background: rgba(255, 70, 70, 0.15);
+  border-color: rgba(255, 70, 70, 0.3);
+  color: #ff8a8a;
+}
+
+.chip-g {
+  background: rgba(70, 220, 120, 0.15);
+  border-color: rgba(70, 220, 120, 0.3);
+  color: #9fffc3;
+}
+
+.chip-b {
+  background: rgba(80, 140, 255, 0.15);
+  border-color: rgba(80, 140, 255, 0.3);
+  color: #9db8ff;
+}
+
+.chip-w {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.chip-br {
+  background: rgba(255, 200, 120, 0.15);
+  border-color: rgba(255, 200, 120, 0.3);
+  color: #ffd8a0;
 }
 
 .power-state {

@@ -19,13 +19,24 @@ const editList = ref<Preset[]>([])
 
 let longPressTimer: ReturnType<typeof setTimeout> | null = null
 let longPressTriggered = false
+let touchStart: { x: number; y: number } | null = null
+const touchMoveThreshold = 8
 
 // --- Drag state ---
 let dragIndex: number | null = null
 
-function startPress() {
+function startPress(event?: MouseEvent | TouchEvent) {
   longPressTriggered = false
   if (longPressTimer) clearTimeout(longPressTimer)
+
+  if (event && 'touches' in event) {
+    const touch = event.touches[0]
+    if (touch) {
+      touchStart = { x: touch.clientX, y: touch.clientY }
+    }
+  } else {
+    touchStart = null
+  }
 
   longPressTimer = setTimeout(() => {
     longPressTimer = null
@@ -34,11 +45,24 @@ function startPress() {
   }, 600)
 }
 
+function handleTouchMove(event: TouchEvent) {
+  if (!touchStart) return
+  const touch = event.touches[0]
+  if (!touch) return
+
+  const dx = touch.clientX - touchStart.x
+  const dy = touch.clientY - touchStart.y
+  if (dx * dx + dy * dy > touchMoveThreshold * touchMoveThreshold) {
+    cancelPress()
+  }
+}
+
 function cancelPress() {
   if (longPressTimer) {
     clearTimeout(longPressTimer)
     longPressTimer = null
   }
+  touchStart = null
 }
 
 function handleClick(preset: Preset) {
@@ -203,10 +227,11 @@ function apply(preset: Preset) {
         v-for="preset in presets"
         :key="preset.id"
         class="preset-row interactive"
-        @mousedown="startPress()"
-        @touchstart.prevent="startPress()"
+        @mousedown="startPress($event)"
+        @touchstart.prevent="startPress($event)"
         @mouseleave="cancelPress"
-        @touchmove="cancelPress"
+        @touchmove="handleTouchMove"
+        @touchend.prevent="handleClick(preset)"
         @touchcancel="cancelPress"
         @click="handleClick(preset)"
         @contextmenu.prevent
@@ -215,7 +240,16 @@ function apply(preset: Preset) {
           class="preview"
           :style="{ background: `rgb(${preset.state.r},${preset.state.g},${preset.state.b})` }"
         />
-        <span class="name">{{ preset.name }}</span>
+        <div class="label">
+          <span class="name">{{ preset.name }}</span>
+          <div class="meta-row">
+            <span class="chip chip-r">R {{ preset.state.r }}</span>
+            <span class="chip chip-g">G {{ preset.state.g }}</span>
+            <span class="chip chip-b">B {{ preset.state.b }}</span>
+            <span class="chip chip-w">W {{ preset.state.w }}</span>
+            <span class="chip chip-br">Br {{ Math.round(preset.state.br * 100) }}%</span>
+          </div>
+        </div>
       </div>
     </template>
 
@@ -242,7 +276,16 @@ function apply(preset: Preset) {
           class="preview"
           :style="{ background: `rgb(${preset.state.r},${preset.state.g},${preset.state.b})` }"
         />
-        <span class="name">{{ preset.name }}</span>
+        <div class="label">
+          <span class="name">{{ preset.name }}</span>
+          <div class="meta-row">
+            <span class="chip chip-r">R {{ preset.state.r }}</span>
+            <span class="chip chip-g">G {{ preset.state.g }}</span>
+            <span class="chip chip-b">B {{ preset.state.b }}</span>
+            <span class="chip chip-w">W {{ preset.state.w }}</span>
+            <span class="chip chip-br">Br {{ Math.round(preset.state.br * 100) }}%</span>
+          </div>
+        </div>
         <button class="delete-btn" @click="removeInEdit(preset)">✕</button>
       </div>
     </template>
@@ -410,11 +453,64 @@ h3 {
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.1);
 }
 
+.label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.2rem;
+}
+
 .name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 500;
   font-size: 0.95rem;
+}
+
+.chip {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-3);
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.02em;
+}
+
+.chip-r {
+  background: rgba(255, 70, 70, 0.15);
+  border-color: rgba(255, 70, 70, 0.3);
+  color: #ff8a8a;
+}
+
+.chip-g {
+  background: rgba(70, 220, 120, 0.15);
+  border-color: rgba(70, 220, 120, 0.3);
+  color: #9fffc3;
+}
+
+.chip-b {
+  background: rgba(80, 140, 255, 0.15);
+  border-color: rgba(80, 140, 255, 0.3);
+  color: #9db8ff;
+}
+
+.chip-w {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.chip-br {
+  background: rgba(255, 200, 120, 0.15);
+  border-color: rgba(255, 200, 120, 0.3);
+  color: #ffd8a0;
 }
 </style>
