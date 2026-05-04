@@ -23,7 +23,7 @@ COPY backend/package*.json ./
 RUN npm install --omit=dev
 
 COPY --from=backend-builder /app/dist ./dist
-COPY --from=frontend-builder /app/dist ./dist/frontend
+COPY --from=frontend-builder /app/backend/frontend ./dist/frontend
 
 VOLUME ["/app/data"]
 
